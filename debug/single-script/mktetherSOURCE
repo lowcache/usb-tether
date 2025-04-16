@@ -62,7 +62,8 @@ check_dependencies() {
 check_device() {
   local devices
   devices=$(adb devices | grep -v "List" | grep -v "^$")
-  local device_count=$(echo "$devices" | grep -c "device$")
+  local device_count
+  device_count=$(echo "$devices" | grep -c "device$")
   
   if [[ $device_count -eq 0 ]]; then
     echo -e "${RED}No Android device detected. Please connect your phone via USB.${NC}"
@@ -73,7 +74,8 @@ check_device() {
     echo "$devices"
     return 1
   else
-    local device_id=$(echo "$devices" | awk '{print $1}')
+    local device_id
+    device_id=$(echo "$devices" | awk '{print $1}')
     echo -e "Using device: ${GREEN}$device_id${NC}"
     return 0
   fi
@@ -88,8 +90,10 @@ wait_for_device() {
 
 # Get device model information
 get_device_info() {
-  local device_model=$(adb shell getprop ro.product.model 2>/dev/null | tr -d '\r')
-  local android_version=$(adb shell getprop ro.build.version.release 2>/dev/null | tr -d '\r')
+  local device_model
+  device_model=$(adb shell getprop ro.product.model 2>/dev/null | tr -d '\r')
+  local android_version
+  android_version=$(adb shell getprop ro.build.version.release 2>/dev/null | tr -d '\r')
   
   if [[ -n "$device_model" ]]; then
     echo -e "${GREEN}Connected to: $device_model (Android $android_version)${NC}"
@@ -191,9 +195,10 @@ configure_network() {
   
   # Add IP address with explicit broadcast
   echo -e "${BLUE}Setting IP address on $iface...${NC}"
-  sudo ip addr add 192.168.42.100/24 broadcast 192.168.42.255 dev "$iface"
+  local setip
+  setip=$(sudo ip addr add 192.168.42.100/24 broadcast 192.168.42.255 dev "$iface")
   
-  if [[ $? -ne 0 ]]; then
+  if ! $setip; then
     echo -e "${RED}Failed to set IP address. This is a critical error.${NC}"
     return 1
   fi
@@ -211,9 +216,11 @@ configure_network() {
   sudo ip route del default via 192.168.42.1 dev "$iface" 2>/dev/null || true
   
   # Add default route
-  sudo ip route add default via 192.168.42.1 dev "$iface"
+  local defroute
+  defroute=$(sudo ip route add default via 192.168.42.1 dev "$iface")
+
   
-  if [[ $? -ne 0 ]]; then
+  if ! $defroute; then
     echo -e "${RED}Failed to set default route. Check for routing conflicts.${NC}"
     return 1
   fi
@@ -271,7 +278,8 @@ optimize_tcp() {
   sudo sysctl -w net.ipv4.tcp_window_scaling=1 >/dev/null 2>&1
   sudo sysctl -w net.ipv4.tcp_fastopen=3 >/dev/null 2>&1
   
-  local available_cc=$(sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | cut -d= -f2)
+  local available_cc
+  available_cc=$(sysctl net.ipv4.tcp_available_congestion_control 2>/dev/null | cut -d= -f2)
   if [[ "$available_cc" == *"bbr"* ]]; then
     echo -e "${GREEN}Enabling BBR congestion control (better for cellular connections)${NC}"
     sudo sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
@@ -318,7 +326,8 @@ disable_usb_power_management() {
   fi
   
   # Disable power management specifically for the tethering interface
-  local usb_path=$(find /sys/class/net/"$iface"/device -name power -type d 2>/dev/null)
+  local usb_path
+  usb_path=$(find /sys/class/net/"$iface"/device -name power -type d 2>/dev/null)
   if [[ -n "$usb_path" && -w "$usb_path/control" ]]; then
     sudo sh -c "echo on > $usb_path/control" 2>/dev/null
     echo -e "${GREEN}Disabled power management for $iface USB device.${NC}"
@@ -397,7 +406,8 @@ main() {
   
   # Detect the appropriate interface automatically
   echo -e "${BLUE}Detecting USB tethering interface...${NC}"
-  local tether_iface=$(detect_new_interface "/tmp/interfaces_before.txt" "/tmp/interfaces_after.txt" | head -1)
+  local tether_iface
+  tether_iface=$(detect_new_interface "/tmp/interfaces_before.txt" "/tmp/interfaces_after.txt" | head -1)
   
   if [[ -z "$tether_iface" ]]; then
     echo -e "${RED}Failed to detect USB tethering interface. Exiting.${NC}"
